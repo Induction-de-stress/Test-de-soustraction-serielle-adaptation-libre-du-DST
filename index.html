@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Digital Stress Test</title>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+            color: #e6e6e6;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #instructions {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 25px 30px;
+            width: 80%;
+            max-width: 600px;
+            line-height: 1.6;
+            font-size: 1.1em;
+            box-shadow: 0 0 25px rgba(0, 255, 150, 0.2);
+            animation: fadeIn 1.5s ease-out;
+        }
+
+        #start-button {
+            margin-top: 40px;
+            padding: 15px 40px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #000;
+            background: linear-gradient(135deg, #00ff99, #00b3ff);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 255, 200, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.3s ease;
+            animation: pulse 2s infinite;
+        }
+
+        #task-container {
+            display: none;
+        }
+
+        #task-container:not(.hidden) {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 80%;
+            max-width: 600px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 30px 40px;
+            box-shadow: 0 0 30px rgba(0, 255, 150, 0.2);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        #timer {
+            font-size: 2.8em;
+            color: #ff4b4b;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(255, 75, 75, 0.5);
+            margin-bottom: 15px;
+        }
+
+        #problem {
+            font-size: 2em;
+            color: #00ffcc;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 255, 200, 0.4);
+            margin: 20px 0;
+        }
+
+        #answer-input {
+            padding: 12px 20px;
+            font-size: 1.5em;
+            width: 70%;
+            text-align: center;
+            color: #00ffcc;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(0, 255, 200, 0.5);
+            border-radius: 10px;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        #answer-input:focus {
+            border-color: #00ffcc;
+            box-shadow: 0 0 15px rgba(0, 255, 200, 0.5);
+        }
+
+        #feedback {
+            font-weight: bold;
+            margin-top: 20px;
+            min-height: 25px;
+        }
+
+        .correct {
+            color: #00ff99;
+            text-shadow: 0 0 10px rgba(0, 255, 150, 0.4);
+        }
+
+        .error {
+            color: #ff4b4b;
+            text-shadow: 0 0 10px rgba(255, 75, 75, 0.4);
+        }
+
+        #continue-button {
+            margin-top: 30px;
+            padding: 12px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #000;
+            background: linear-gradient(135deg, #00ff99, #00b3ff);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 255, 200, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.3s ease;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 150, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(0, 255, 255, 0.6); }
+        }
+    </style>
+</head>
+<body>
+
+    <p id="instructions">
+        INSTRUCTIONS : 
+        Votre tâche est de soustraire 13 du nombre affiché, et de recommencer à 1022 en cas d'erreur. Vous avez 2 minutes. Appuyez sur Entrée pour valider.
+    </p>
+    <button id="start-button">Démarrer le Test de Stress</button>
+
+    <div id="task-container" class="hidden">
+        <div id="timer">02:00</div>
+        <div id="problem">En attente...</div>
+        <input type="number" id="answer-input" placeholder="Votre réponse" autofocus>
+        <p id="feedback"></p>
+
+        <input type="hidden" id="DST_SCORE" name="DST_SCORE" value="0">
+        <input type="hidden" id="DST_ATTEMPTS" name="DST_ATTEMPTS" value="0">
+
+        <button id="continue-button" type="submit" style="display: none;">Continuer l'Expérience</button>
+    </div>
+
+    <script>
+        var START_NUMBER = 1022;
+        var SUBTRACTION_VALUE = 13;
+        var GAME_DURATION = 120;
+
+        var currentNumber = START_NUMBER;
+        var timerInterval = null;
+        var timeLeft = GAME_DURATION;
+        var gameActive = false;
+        var correctCount = 0;
+        var maxStreak = 0;
+        var totalAttempts = 0;
+
+        var timerDisplay = document.getElementById('timer');
+        var problemDisplay = document.getElementById('problem');
+        var answerInput = document.getElementById('answer-input');
+        var feedbackDisplay = document.getElementById('feedback');
+        var taskContainer = document.getElementById('task-container');
+        var instructions = document.getElementById('instructions');
+        var startButton = document.getElementById('start-button');
+
+        function formatTime(totalSeconds) {
+            var minutes = Math.floor(totalSeconds / 60);
+            var seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateDisplay() {
+            if (problemDisplay) problemDisplay.textContent = `Nombre actuel : ${currentNumber}. Soustrayez ${SUBTRACTION_VALUE}.`;
+            if (timerDisplay) timerDisplay.textContent = formatTime(timeLeft);
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(function() {
+                timeLeft--;
+                if (timeLeft >= 0) timerDisplay.textContent = formatTime(timeLeft);
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    endGame("Temps écoulé ! La tâche est terminée.");
+                }
+            }, 1000);
+        }
+
+        function resetGame() {
+            clearInterval(timerInterval);
+            currentNumber = START_NUMBER;
+            timeLeft = GAME_DURATION;
+            correctCount = 0;
+            maxStreak = 0;
+            totalAttempts = 0;
+            gameActive = true;
+
+            answerInput.value = '';
+            feedbackDisplay.textContent = 'Concentrez-vous ! Appuyez sur Entrée pour valider.';
+            feedbackDisplay.className = '';
+            startButton.style.display = 'none';
+
+            updateDisplay();
+        }
+
+        function startGame() {
+            instructions.classList.add('hidden');
+            taskContainer.classList.remove('hidden');
+            resetGame();
+            startTimer();
+            answerInput.focus();
+        }
+
+        function processAnswer() {
+            if (!gameActive) return;
+            var userAnswer = parseInt(answerInput.value);
+            var correctAnswer = currentNumber - SUBTRACTION_VALUE;
+            totalAttempts++;
+
+            if (isNaN(userAnswer)) {
+                feedbackDisplay.textContent = 'Veuillez entrer un nombre.';
+                feedbackDisplay.className = 'error';
+                answerInput.value = '';
+                return;
+            }
+
+            if (userAnswer === correctAnswer) {
+                currentNumber = correctAnswer;
+                correctCount++;
+                if (correctCount > maxStreak) {
+                    maxStreak = correctCount;
+                }
+                feedbackDisplay.textContent = '✅ Correct ! Continuez la soustraction...';
+                feedbackDisplay.className = 'correct';
+            } else {
+                feedbackDisplay.textContent = `❌ ERREUR ! Recommencez à partir de ${START_NUMBER}.`;
+                feedbackDisplay.className = 'error';
+                currentNumber = START_NUMBER;
+                correctCount = 0;
+            }
+
+            answerInput.value = '';
+            updateDisplay();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') processAnswer();
+        }
+
+        function endGame(message) {
+            gameActive = false;
+            clearInterval(timerInterval);
+
+            document.getElementById('DST_SCORE').value = maxStreak;
+            document.getElementById('DST_ATTEMPTS').value = totalAttempts;
+
+            problemDisplay.textContent = message;
+            answerInput.classList.add('hidden');
+            feedbackDisplay.textContent = `Résultat final : ${totalAttempts} tentatives, ${maxStreak} max consécutives.`;
+            feedbackDisplay.className = 'correct';
+            document.getElementById('continue-button').style.display = 'block';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            startButton.addEventListener('click', startGame);
+            answerInput.addEventListener('keydown', handleKeyPress);
+            updateDisplay();
+        });
+    </script>
+
+    <script>
+	  const pass = prompt("Entrez le code d'accès :");
+	  if (pass !== "code-secret-123") {
+	    document.body.innerHTML = "<h1>Accès refusé</h1>";
+	  }
+	</script>
+</body>
+</html>
